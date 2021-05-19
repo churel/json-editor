@@ -1,5 +1,7 @@
 ### Unreleased
 
+- fixed arbitrary JSON pointers not returning the schema at the pointer path
+
 ### 2.6.0
 
 - set show_opt_in per object editor
