@@ -83,25 +83,6 @@ export class SchemaLoader {
     }
   }
 
-  // /**
-  //  * Fully loads and expands JSON schema for a provided schema object and URL.
-  //  *
-  //  * The callback receives a expanded JSON Schema object with references
-  //  * replaced with loaded schemas.
-  //  *
-  //  * @param {object} schema - A JSON Schema.
-  //  * @param {function} callback - A function that takes a JSON object argument.
-  //  * @param {string} fetchUrl - Base path from which to store the definitions.
-  //  *   Typically the URI of the schema.
-  //  * @param {*} location - The base URL from which to load relative paths.
-  //  */
-  // load (schema, callback, fetchUrl, location) {
-  //   this._loadExternalRefs(schema, () => {
-  //     this._getDefinitions(schema, `${fetchUrl}#/definitions/`)
-  //     callback(this.expandRefs(schema))
-  //   }, fetchUrl, this._getFileBase(location))
-  // }
-
   /**
    * Fully loads and expands JSON schema for a provided schema object and URL.
    *
@@ -358,7 +339,6 @@ export class SchemaLoader {
       }
 
       if (!this.options.ajax) throw new Error(`Must set ajax option to true to load external ref ${uri}`)
-      // this.refs[uri] = 'loading'
       waiting++
 
       let url = this._joinUrl(uri, fileBase)
@@ -400,7 +380,6 @@ export class SchemaLoader {
       }
       await this._asyncloadExternalRefs(schema, url, newfileBase)
     }
-    // done = true
     if (!waiting) {
       return true
     }

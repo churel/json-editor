@@ -235,7 +235,6 @@ describe('SchemaLoader', () => {
         fetchUrl,
         fileBase
       )
-      console.log(loader.refs)
       expect(Object.keys(loader.refs).length).toBe(2)
 
       server.restore()
@@ -289,7 +288,6 @@ describe('SchemaLoader', () => {
         fetchUrl,
         fileBase
       )
-      console.log(loader.refs)
       expect(Object.keys(loader.refs).length).toBe(3)
       server.restore()
     })
@@ -342,7 +340,6 @@ describe('SchemaLoader', () => {
         fetchUrl,
         fileBase
       )
-      console.log(loader.refs)
       expect(Object.keys(loader.refs).length).toBe(4)
       server.restore()
     })
@@ -386,7 +383,6 @@ describe('SchemaLoader', () => {
         fileBase
       )
       const urls = Object.keys(loader.refs)
-      console.log(urls)
       expect(urls.length).toEqual(1)
       expect(urls[0]).toEqual('/fruits.json#/definitions/fruits')
       expect(loader.refs['/fruits.json#/definitions/fruits']).toEqual({ enum: ['apple', 'banana', 'cherry'] })
@@ -436,7 +432,6 @@ describe('SchemaLoader', () => {
       await loader.load(
         schema1
       )
-      console.log(loader.refs_with_info)
       expect(Object.keys(loader.refs).length).toBe(4)
     })
   })
@@ -469,7 +464,6 @@ describe('SchemaLoader', () => {
         }
       })
       await loader.load(schema1)
-      console.log(loader.refs_with_info)
       expect(Object.keys(loader.refs).length).toBe(2)
     })
   })
