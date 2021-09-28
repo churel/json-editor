@@ -33,6 +33,7 @@ describe('JSONEditor', function () {
   })
 
   it('should create an editor', () => {
+    // eslint-disable-next-line no-console
     console.log('Attempting to create new JSONEditor')
     editor = new JSONEditor(element, { schema: schema })
     expect(editor).toBeTruthy()
