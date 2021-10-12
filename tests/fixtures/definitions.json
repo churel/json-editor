@@ -13,6 +13,11 @@
                 "state":          { "type": "string" }
             },
             "required": ["street_address"]
-        }
+        },
+        "link" : {"$refs": "./properties.json#/properties/title"}
+    
+    },
+    "properties": {
+        "address" : {"$refs": "#/definitions/address"}
     }
   }

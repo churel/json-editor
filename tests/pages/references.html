@@ -70,28 +70,31 @@
             }
           },
           properties: {
-            orgid: { $ref: "#/definitions/taxid" },
-            address: {
-              $ref: "../fixtures/definitions.json#/definitions/address"
-            },
-            people: {
-              type: "array",
-              title: "People",
-              format: "tabs",
-              items: {
-                title: "Person",
-                headerTemplate: "{{i}} - {{self.name}}",
-                oneOf: [
-                  {
-                    $ref: "../fixtures/basic_person.json",
-                    title: "Basic Person"
-                  },
-                  {
-                    $ref: "../fixtures/person.json",
-                    title: "Complex Person"
-                  }
-                ]
-              }
+            // orgid: { $ref: "#/definitions/taxid" },
+            // address: {
+            //   $ref: "../fixtures/definitions.json#/definitions/address"
+            // },
+            // people: {
+            //   type: "array",
+            //   title: "People",
+            //   format: "tabs",
+            //   items: {
+            //     title: "Person",
+            //     headerTemplate: "{{i}} - {{self.name}}",
+            //     oneOf: [
+            //       {
+            //         $ref: "../fixtures/basic_person.json",
+            //         title: "Basic Person"
+            //       },
+            //       {
+            //         $ref: "../fixtures/person.json",
+            //         title: "Complex Person"
+            //       }
+            //     ]
+            //   }
+            // },
+            link: {
+              $ref: '../fixtures/definitions.json#/properties/address'
             }
           }
         },

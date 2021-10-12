@@ -6,6 +6,23 @@ import { extend, hasOwnProperty } from './utilities.js'
 export class SchemaLoader {
   constructor (options) {
     this.options = options || {}
+    /**
+     * refs_with_info = {
+     *   "#/counter/1": "fully/realized/path/to/schema.json"
+     *   "#/counter/2": "mylocalschema.json"
+     * }
+     *
+     * refs = {
+     *  "fully/realized/path/to/schema.json": { ... }
+     *  "mylocalschema.json": { ... }
+     * }
+     *
+     * schema = {
+     *   "$ref": "fully/realized/path/to/schema.json" => "#/counter/1"
+     *   "$ref": "#definitions/otherschema"  => "#/counter/1/#definitions/otherschema"
+     * }
+     *
+     */
     this.refs = this.options.refs || {}
     this.refs_with_info = {}
     this.refs_prefix = '#/counter/'
@@ -97,7 +114,7 @@ export class SchemaLoader {
    */
   async load (schema, fetchUrl, location) {
     await this._asyncloadExternalRefs(schema, fetchUrl, this._getFileBase(location))
-    this._getDefinitions(schema, `${fetchUrl}#/definitions/`)
+    // this._getDefinitions(schema, `${fetchUrl}#/definitions/`)
     return this.expandRefs(schema)
   }
 
@@ -183,9 +200,43 @@ export class SchemaLoader {
         this.refs[path + i] = schema.definitions[i]
         if (schema.definitions[i].definitions) {
           this._getDefinitions(schema.definitions[i], `${path + i}/definitions/`)
+          // this.schema[path] = schema[pat]
         }
       })
     }
+  }
+
+  /**
+   * Rewrite the passed schema's JSON pointers to prepend with the current reference's path, so that it will be converted to a reference "counter".
+   *
+   * @example
+   * In file "../otherreferencedfile.json", referenced from "schema.json":
+   *
+   * "$ref": "#/definitions/myschema" => "$ref": "../path/to/my/referenced/schemafile.json#/definitions/myschema"
+   *   ...which will then be parsed later in loadExternalReferences() to "$ref": "#/counter/1#/definitions/myschema"
+   *
+   * @param {object} schema - A JSON Schema with the definitions key present.
+   * @param {string} path - Base path from which to store the definitions in refs. (exemple ../path/to/my/referenced/schemafile.json)
+   *   Typically the URI of the schema.
+   */
+  _manageRecursivePointer (schema, path) {
+    Object.keys(schema).forEach(i => {
+      if (schema[i].$ref && schema[i].$ref.indexOf('#') === 0) {
+        schema[i].$ref = path + schema[i].$ref
+        console.log(schema[i].$ref, '_manageRecursivePointer')
+      } else if (typeof schema[i] === 'object') {
+        this._manageRecursivePointer(schema[i], path)
+      }
+    })
+    // if (schema) {
+    //   Object.keys(schema.definitions).forEach(i => {
+    //     this.refs[path + i] = schema.definitions[i]
+    //     if (schema.definitions[i].definitions) {
+    //       this._manageRecursivePointer(schema, path)
+    //       // this.schema[path] = schema[pat]
+    //     }
+    //   })
+    // }
   }
 
   /**
@@ -198,19 +249,25 @@ export class SchemaLoader {
   _getExternalRefs (schema, fetchUrl) {
     const refs = {}
     const mergeRefs = newrefs => Object.keys(newrefs).forEach(i => { refs[i] = true })
-
     if (schema.$ref && typeof schema.$ref !== 'object') {
       let refBase = schema.$ref
       let pointer = ''
+      // Rewrite all internal JSON pointers for external references.
+      if (refBase.indexOf('#') === 0) {
+        console.log(fetchUrl, '_getExternalRefs Internal JSON Pointer')
+        schema.$ref = fetchUrl + refBase
+      }
+
       // Strip any JSON pointers found for external refs.
       if (refBase.indexOf('#') > 0) refBase = refBase.substr(0, refBase.indexOf('#'))
       if (refBase !== schema.$ref) pointer = schema.$ref.substr(schema.$ref.indexOf('#') + 1)
-      const refCounter = this.refs_prefix + this.refs_counter++ + pointer
+      const refCounter = this.refs_prefix + this.refs_counter++
+      const refPointer = refCounter + pointer
       if (schema.$ref.substr(0, 1) !== '#' && !this.refs[schema.$ref]) {
         refs[refBase] = true
       }
       this.refs_with_info[refCounter] = { fetchUrl, $ref: refBase }
-      schema.$ref = refCounter
+      schema.$ref = refPointer
     }
 
     Object.values(schema).forEach(value => {
@@ -287,13 +344,16 @@ export class SchemaLoader {
    * @throws Error
    */
   async _asyncloadExternalRefs (schema, fetchUrl, fileBase) {
+    console.trace()
     const refs = this._getExternalRefs(schema, fetchUrl)
+    console.log(refs)
     let waiting = 0
     // Loop into all schema references
     for (const uri of Object.keys(refs)) {
       if (typeof uri === 'undefined') return
       if (this.refs[uri]) return
       if (this._isUniformResourceName(uri)) {
+        console.log(uri, '_asyncloadExternalRefs URI _isUniformResourceName')
         this.refs[uri] = 'loading'
         waiting++
         const urnResolver = this.options.urn_resolver
@@ -307,21 +367,22 @@ export class SchemaLoader {
         if (urn.indexOf('#') > 0) urn = urn.substr(0, urn.indexOf('#'))
         let response
         try {
-          let schema
+          let externalSchema
           response = await urnResolver(urn)
           try {
-            schema = JSON.parse(response)
+            externalSchema = JSON.parse(response)
           } catch (e) {
             // eslint-disable-next-line no-console
             console.log(e)
             throw new Error(`Failed to parse external ref ${urn}`)
           }
-          if (!(typeof schema === 'boolean' || typeof schema === 'object') || schema === null || Array.isArray(schema)) {
+          if (!(typeof externalSchema === 'boolean' || typeof externalSchema === 'object') || externalSchema === null || Array.isArray(externalSchema)) {
             throw new Error(`External ref does not contain a valid schema - ${urn}`)
           }
-          this.refs[uri] = schema
-          this._getDefinitions(schema, `${urn}#/definitions/`)
-          const load = await this._asyncloadExternalRefs(schema, uri, fileBase)
+          this.refs[uri] = externalSchema
+          // this._getDefinitions(externalSchema, urn)
+
+          const load = await this._asyncloadExternalRefs(externalSchema, uri, fileBase)
           if (!load) {
             return false
           }
@@ -337,7 +398,7 @@ export class SchemaLoader {
 
         return
       }
-
+      console.log(uri, '_asyncloadExternalRefs URI _Not')
       if (!this.options.ajax) throw new Error(`Must set ajax option to true to load external ref ${uri}`)
       waiting++
 
@@ -356,23 +417,22 @@ export class SchemaLoader {
         r.send()
       })
       if (typeof response === 'undefined') throw new Error(`Failed to fetch ref via ajax - ${uri}`)
-      let schema
+      let externalSchema
       try {
-        schema = JSON.parse(response.responseText)
+        externalSchema = JSON.parse(response.responseText)
       } catch (e) {
         // eslint-disable-next-line no-console
         console.log(e)
         throw new Error(`Failed to parse external ref ${url}`)
       }
 
-      if (!(typeof schema === 'boolean' || typeof schema === 'object') || schema === null || Array.isArray(schema)) {
+      if (!(typeof externalSchema === 'boolean' || typeof externalSchema === 'object') || externalSchema === null || Array.isArray(externalSchema)) {
         throw new Error(`External ref does not contain a valid schema - ${url}`)
       }
-      this.refs[uri] = schema
+      this.refs[uri] = externalSchema
       const newfileBase = this._getFileBaseFromFileLocation(url)
 
-      this._getDefinitions(schema, `${uri}#/definitions/`)
-
+      // this._getDefinitions(externalSchema, `${uri}#/definitions/`)
       // Add leading slash.
       if (url !== uri) {
         const pathItems = url.split('/')
