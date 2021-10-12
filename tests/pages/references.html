@@ -67,9 +67,23 @@
             taxid: {
               type: "string",
               title: "Tax ID"
-            }
+            },
+            external: {
+                  $ref: "../fixtures/string.json"
+              }
           },
           properties: {
+                external: {
+                    $ref: "#/definitions/external"
+                }
+            },
+            
+               
+          properties: {
+            external: {
+                    $ref: "#/definitions/external"
+            },
+
             orgid: { $ref: "#/definitions/taxid" },
             address: {
               $ref: "../fixtures/definitions.json#/definitions/address"
@@ -92,7 +106,7 @@
                   }
                 ]
               }
-            }
+            },
           }
         },
         
