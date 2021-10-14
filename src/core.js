@@ -80,7 +80,6 @@ export class JSONEditor {
     this.root.preBuild()
     this.root.build()
     this.root.postBuild()
-    console.log(loader)
     /* Starting data */
     if (hasOwnProperty(this.options, 'startval')) this.root.setValue(this.options.startval)
 

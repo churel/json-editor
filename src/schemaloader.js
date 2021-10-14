@@ -19,10 +19,11 @@ export class SchemaLoader {
      *
      * schema = {
      *   "$ref": "fully/realized/path/to/schema.json" => "#/counter/1"
-     *   "$ref": "#definitions/otherschema"  => "#/counter/1/#definitions/otherschema"
+     *   "$ref": "#definitions/otherschema"  => "#/counter/1/definitions/otherschema"
      * }
      *
      */
+    this.schema = {}
     this.refs = this.options.refs || {}
     this.refs_with_info = {}
     this.refs_prefix = '#/counter/'
@@ -113,8 +114,8 @@ export class SchemaLoader {
    * @returns {object} A JSON Schema with references expanded.
    */
   async load (schema, fetchUrl, location) {
+    this.schema = schema
     await this._asyncloadExternalRefs(schema, fetchUrl, this._getFileBase(location))
-    // this._getDefinitions(schema, `${fetchUrl}#/definitions/`)
     return this.expandRefs(schema)
   }
 
@@ -128,8 +129,18 @@ export class SchemaLoader {
   expandRefs (schema, recurseAllOf) {
     const _schema = extend({}, schema)
     if (!_schema.$ref) return _schema
-
-    const refObj = this.refs_with_info[_schema.$ref]
+    // This split the ref to get the Json point if it exists
+    // exemple #/counter/1#/definition/address +
+    // [1] -> /counter/1
+    // [2] -> /definition/address
+    const refWithPointerSplit = _schema.$ref.split('#')
+    // Local ref
+    if (refWithPointerSplit.length === 2) {
+      return this.extendSchemas(_schema, this.expandSchema(this.expandRecursivePointer(this.schema, refWithPointerSplit[1])))
+    }
+    const refObj = (refWithPointerSplit.length > 2)
+      ? this.refs_with_info['#' + refWithPointerSplit[1]]
+      : this.refs_with_info[_schema.$ref]
     delete _schema.$ref
     const fetchUrl = refObj.$ref.startsWith('#')
       ? refObj.fetchUrl
@@ -145,8 +156,52 @@ export class SchemaLoader {
         allOf[key] = this.expandRefs(allOf[key], true)
       })
     }
+    if (refWithPointerSplit.length > 2) {
+      return this.extendSchemas(_schema, this.expandSchema(this.expandRecursivePointer(this.refs[ref], refWithPointerSplit[2])))
+    } else {
+      return this.extendSchemas(_schema, this.expandSchema(this.refs[ref]))
+    }
+  }
 
-    return this.extendSchemas(_schema, this.expandSchema(this.refs[ref]))
+  /**
+  * Returns a subschema based on a JSON Pointer path.
+  * @param {object} schema - Schema too into
+  * @param {string} pointer - path to look for
+  * @param {object} original_schema - the Original schema
+  * @returns the subschema pointed to by the path
+  */
+  expandRecursivePointer (schema, pointer) {
+    let subschema = schema
+    pointer.split('/').slice(1).forEach(i => {
+      if (subschema[i]) {
+        subschema = subschema[i]
+      }
+    })
+    // If the result is a pointer, let's go for another turn
+    if (subschema.$refs && subschema.$refs.startsWith('#')) {
+      return this.expandRecursivePointer(schema, subschema.$refs)
+    }
+    return subschema
+    // Remove file /
+    // if (pointer.startsWith('/')) pointer = pointer.substring(1)
+    // const path = pointer.split('/')
+    // if (schema[path[0]]) {
+    //   const subSchema = schema[path[0]]
+    //   if (path.length > 1) {
+    //     path.shift()
+    //     return this.expandRecursivePointer(subSchema, path[0], original_schema)
+    //   } else {
+    //     // Let's check if there another reference is there
+    //     if (typeof subSchema === 'string' && subSchema.startsWith('#')) {
+
+    //     } else { return subSchema }
+    //   }
+    // } else {
+    //   // eslint-disable-next-line no-console
+    //   console.warn(`Json Pointer:'${pointer}' not found in schema ${schema}!`)
+    //   // Return the schema ??
+    //   return schema
+    // }
   }
 
   /**
@@ -223,20 +278,10 @@ export class SchemaLoader {
     Object.keys(schema).forEach(i => {
       if (schema[i].$ref && schema[i].$ref.indexOf('#') === 0) {
         schema[i].$ref = path + schema[i].$ref
-        console.log(schema[i].$ref, '_manageRecursivePointer')
       } else if (typeof schema[i] === 'object') {
         this._manageRecursivePointer(schema[i], path)
       }
     })
-    // if (schema) {
-    //   Object.keys(schema.definitions).forEach(i => {
-    //     this.refs[path + i] = schema.definitions[i]
-    //     if (schema.definitions[i].definitions) {
-    //       this._manageRecursivePointer(schema, path)
-    //       // this.schema[path] = schema[pat]
-    //     }
-    //   })
-    // }
   }
 
   /**
@@ -260,7 +305,10 @@ export class SchemaLoader {
 
       // Strip any JSON pointers found for external refs.
       if (refBase.indexOf('#') > 0) refBase = refBase.substr(0, refBase.indexOf('#'))
-      if (refBase !== schema.$ref) pointer = schema.$ref.substr(schema.$ref.indexOf('#') + 1)
+      // We use a fragment idenfier to track json pointer in top of our pointer
+      if (refBase !== schema.$ref) pointer = schema.$ref.substr(schema.$ref.indexOf('#'))
+      // @TODO Remove comment
+      // if (refBase !== schema.$ref) pointer = schema.$ref.substr(schema.$ref.indexOf('#') + 1)
       const refCounter = this.refs_prefix + this.refs_counter++
       const refPointer = refCounter + pointer
       if (schema.$ref.substr(0, 1) !== '#' && !this.refs[schema.$ref]) {
@@ -279,7 +327,13 @@ export class SchemaLoader {
           }
         })
       } else {
-        mergeRefs(this._getExternalRefs(value, fetchUrl))
+        // @TODO make cleaner
+        if (value.$ref && value.$ref.startsWith('#')) {
+          // console.log(mergeRefs(this._getExternalRefs(value, fetchUrl)))
+        } else {
+          // console.log(value.$ref)
+          mergeRefs(this._getExternalRefs(value, fetchUrl))
+        }
       }
     })
 
@@ -344,16 +398,13 @@ export class SchemaLoader {
    * @throws Error
    */
   async _asyncloadExternalRefs (schema, fetchUrl, fileBase) {
-    console.trace()
     const refs = this._getExternalRefs(schema, fetchUrl)
-    console.log(refs)
     let waiting = 0
     // Loop into all schema references
     for (const uri of Object.keys(refs)) {
       if (typeof uri === 'undefined') return
       if (this.refs[uri]) return
       if (this._isUniformResourceName(uri)) {
-        console.log(uri, '_asyncloadExternalRefs URI _isUniformResourceName')
         this.refs[uri] = 'loading'
         waiting++
         const urnResolver = this.options.urn_resolver
@@ -398,7 +449,6 @@ export class SchemaLoader {
 
         return
       }
-      console.log(uri, '_asyncloadExternalRefs URI _Not')
       if (!this.options.ajax) throw new Error(`Must set ajax option to true to load external ref ${uri}`)
       waiting++
 
@@ -438,7 +488,8 @@ export class SchemaLoader {
         const pathItems = url.split('/')
         url = (uri.substr(0, 1) === '/' ? '/' : '') + pathItems.pop()
       }
-      await this._asyncloadExternalRefs(schema, url, newfileBase)
+      console.log('test')
+      await this._asyncloadExternalRefs(externalSchema, url, newfileBase)
     }
     if (!waiting) {
       return true
