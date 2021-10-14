@@ -67,35 +67,46 @@
             taxid: {
               type: "string",
               title: "Tax ID"
-            }
+            },
+            external: {
+                  $ref: "../fixtures/string.json"
+              }
           },
           properties: {
-            // orgid: { $ref: "#/definitions/taxid" },
-            // address: {
-            //   $ref: "../fixtures/definitions.json#/definitions/address"
-            // },
-            // people: {
-            //   type: "array",
-            //   title: "People",
-            //   format: "tabs",
-            //   items: {
-            //     title: "Person",
-            //     headerTemplate: "{{i}} - {{self.name}}",
-            //     oneOf: [
-            //       {
-            //         $ref: "../fixtures/basic_person.json",
-            //         title: "Basic Person"
-            //       },
-            //       {
-            //         $ref: "../fixtures/person.json",
-            //         title: "Complex Person"
-            //       }
-            //     ]
-            //   }
-            // },
-            link: {
-              $ref: '../fixtures/definitions.json#/definitions/link'
-            }
+                external: {
+                    $ref: "#/definitions/external"
+                }
+            },
+            
+               
+          properties: {
+            external: {
+                    $ref: "#/definitions/external"
+            },
+
+            orgid: { $ref: "#/definitions/taxid" },
+            address: {
+              $ref: "../fixtures/definitions.json#/definitions/address"
+            },
+            people: {
+              type: "array",
+              title: "People",
+              format: "tabs",
+              items: {
+                title: "Person",
+                headerTemplate: "{{i}} - {{self.name}}",
+                oneOf: [
+                  {
+                    $ref: "../fixtures/basic_person.json",
+                    title: "Basic Person"
+                  },
+                  {
+                    $ref: "../fixtures/person.json",
+                    title: "Complex Person"
+                  }
+                ]
+              }
+            },
           }
         },
         

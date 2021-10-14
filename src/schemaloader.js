@@ -5,28 +5,47 @@ import { extend, hasOwnProperty } from './utilities.js'
  */
 export class SchemaLoader {
   constructor (options) {
-    this.options = options || {}
     /**
-     * refs_with_info = {
-     *   "#/counter/1": "fully/realized/path/to/schema.json"
-     *   "#/counter/2": "mylocalschema.json"
-     * }
-     *
-     * refs = {
-     *  "fully/realized/path/to/schema.json": { ... }
-     *  "mylocalschema.json": { ... }
-     * }
-     *
-     * schema = {
-     *   "$ref": "fully/realized/path/to/schema.json" => "#/counter/1"
-     *   "$ref": "#definitions/otherschema"  => "#/counter/1/definitions/otherschema"
-     * }
-     *
+     * @prop {object}
+     *  Options of the schema. @see readme.
+     */
+    this.options = options || {}
+
+    /**
+     * @prop {object}
+     *  The orginial schema to load
      */
     this.schema = {}
+    /**
+     * @prop {object}
+     *  Storage of External ref. Exemple :
+     *  refs = {
+     *    "fully/realized/path/to/schema.json": { ... }
+     *    "mylocalschema.json": { ... }
+     *  }
+     */
     this.refs = this.options.refs || {}
+
+    /**
+     * @prop {object}
+     *  Mapping between the schema and ref. Exemple:
+     *  refs_with_info = {
+     *   "#/counter/1": "fully/realized/path/to/schema.json"
+     *   "#/counter/2": "mylocalschema.json"
+     *  }
+     */
     this.refs_with_info = {}
+
+    /**
+     * @prop {string}
+     *  String to eewrite external ref with.
+     */
     this.refs_prefix = '#/counter/'
+
+    /**
+     * @prop {int}
+     *  Counter of ref
+     */
     this.refs_counter = 1
 
     this._subSchema1 = {
@@ -134,8 +153,8 @@ export class SchemaLoader {
     // [1] -> /counter/1
     // [2] -> /definition/address
     const refWithPointerSplit = _schema.$ref.split('#')
-    // Local ref
-    if (refWithPointerSplit.length === 2) {
+    // If local ref
+    if (refWithPointerSplit.length === 2 && !this.refs_with_info[_schema.$ref]) {
       return this.extendSchemas(_schema, this.expandSchema(this.expandRecursivePointer(this.schema, refWithPointerSplit[1])))
     }
     const refObj = (refWithPointerSplit.length > 2)
@@ -182,26 +201,6 @@ export class SchemaLoader {
       return this.expandRecursivePointer(schema, subschema.$refs)
     }
     return subschema
-    // Remove file /
-    // if (pointer.startsWith('/')) pointer = pointer.substring(1)
-    // const path = pointer.split('/')
-    // if (schema[path[0]]) {
-    //   const subSchema = schema[path[0]]
-    //   if (path.length > 1) {
-    //     path.shift()
-    //     return this.expandRecursivePointer(subSchema, path[0], original_schema)
-    //   } else {
-    //     // Let's check if there another reference is there
-    //     if (typeof subSchema === 'string' && subSchema.startsWith('#')) {
-
-    //     } else { return subSchema }
-    //   }
-    // } else {
-    //   // eslint-disable-next-line no-console
-    //   console.warn(`Json Pointer:'${pointer}' not found in schema ${schema}!`)
-    //   // Return the schema ??
-    //   return schema
-    // }
   }
 
   /**
@@ -299,7 +298,6 @@ export class SchemaLoader {
       let pointer = ''
       // Rewrite all internal JSON pointers for external references.
       if (refBase.indexOf('#') === 0) {
-        console.log(fetchUrl, '_getExternalRefs Internal JSON Pointer')
         schema.$ref = fetchUrl + refBase
       }
 
@@ -327,11 +325,8 @@ export class SchemaLoader {
           }
         })
       } else {
-        // @TODO make cleaner
-        if (value.$ref && value.$ref.startsWith('#')) {
-          // console.log(mergeRefs(this._getExternalRefs(value, fetchUrl)))
-        } else {
-          // console.log(value.$ref)
+        // Merge Ref if it's not a Pointer
+        if (!value.$ref || !value.$ref.startsWith('#')) {
           mergeRefs(this._getExternalRefs(value, fetchUrl))
         }
       }
@@ -488,7 +483,6 @@ export class SchemaLoader {
         const pathItems = url.split('/')
         url = (uri.substr(0, 1) === '/' ? '/' : '') + pathItems.pop()
       }
-      console.log('test')
       await this._asyncloadExternalRefs(externalSchema, url, newfileBase)
     }
     if (!waiting) {
