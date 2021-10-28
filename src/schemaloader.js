@@ -303,7 +303,7 @@ export class SchemaLoader {
         })
       } else {
         // Merge Ref if it's not a Pointer
-        if (!value.$ref || !value.$ref.startsWith('#')) {
+        if (!value.$ref || !(typeof value.$ref === 'string' && value.$ref.startsWith('#'))) {
           mergeRefs(this._getExternalRefs(value, fetchUrl, firstIteration))
         }
       }
