@@ -261,8 +261,6 @@ export class SchemaLoader {
     Object.keys(schema).forEach(i => {
       if (schema[i].$ref && schema[i].$ref.indexOf('#') === 0) {
         schema[i].$ref = path + schema[i].$ref
-      } else if (typeof schema[i] === 'object') {
-      //  this._manageRecursivePointer(schema[i], path)
       }
     })
   }
@@ -272,22 +270,16 @@ export class SchemaLoader {
    *
    * @param {object} schema - A JSON Schema
    * @param {string} fetchUrl - Base path from which to store the definitions.
-   * @param {boolean} firstLoad - Is it the first time we load this function? Help making difference between external ref vs internal pointer
+   * @param {boolean} firstIteration - Is it the first time we load this function? Help making difference between external ref vs internal pointer
    * @returns {array} Refs in the format of uri => true if external.
    */
-  _getExternalRefs (schema, fetchUrl, firstLoad = false) {
-    if (!firstLoad) this._manageRecursivePointer(schema, fetchUrl)
+  _getExternalRefs (schema, fetchUrl, firstIteration = false) {
+    if (!firstIteration) this._manageRecursivePointer(schema, fetchUrl)
     const refs = {}
     const mergeRefs = newrefs => Object.keys(newrefs).forEach(i => { refs[i] = true })
-    if (schema.$ref && typeof schema.$ref !== 'object' && !(schema.$ref.indexOf('#') === 0 && firstLoad)) {
+    if (schema.$ref && typeof schema.$ref !== 'object' && !(schema.$ref.indexOf('#') === 0 && firstIteration)) {
       let refBase = schema.$ref
       let pointer = ''
-      // Rewrite all internal JSON pointers for external references.
-      // if (refBase.indexOf('#') === 0) {
-      //   schema.$ref = fetchUrl + refBase
-      // }
-      // Remove Local pointer of original schema
-
       // Strip any JSON pointers found for external refs.
       if (refBase.indexOf('#') > 0) refBase = refBase.substr(0, refBase.indexOf('#'))
       if (refBase !== schema.$ref) pointer = schema.$ref.substr(schema.$ref.indexOf('#'))
@@ -306,13 +298,13 @@ export class SchemaLoader {
       if (Array.isArray(value)) {
         Object.values(value).forEach(e => {
           if (e && typeof e === 'object') {
-            mergeRefs(this._getExternalRefs(e, fetchUrl, firstLoad))
+            mergeRefs(this._getExternalRefs(e, fetchUrl, firstIteration))
           }
         })
       } else {
         // Merge Ref if it's not a Pointer
         if (!value.$ref || !value.$ref.startsWith('#')) {
-          mergeRefs(this._getExternalRefs(value, fetchUrl, firstLoad))
+          mergeRefs(this._getExternalRefs(value, fetchUrl, firstIteration))
         }
       }
     })
@@ -372,13 +364,13 @@ export class SchemaLoader {
    *   Typically the URI of the schema.
    * @param {string} fileBase - The base URL from which to load relative paths.
    *   Typically the URI of the schema minus filename, with trailing slash.
-   * @param {boolean} firstLoad - Is it the first time we load this function? Help making difference between external ref vs internal pointer
+   * @param {boolean} firstIteration - Is it the first time we load this function? Help making difference between external ref vs internal pointer
    *
    * @return {boolean}
    * @throws Error
    */
-  async _asyncloadExternalRefs (schema, fetchUrl, fileBase, firstLoad = false) {
-    const refs = this._getExternalRefs(schema, fetchUrl, firstLoad)
+  async _asyncloadExternalRefs (schema, fetchUrl, fileBase, firstIteration = false) {
+    const refs = this._getExternalRefs(schema, fetchUrl, firstIteration)
     let waiting = 0
     // Loop into all schema references
     for (const uri of Object.keys(refs)) {
